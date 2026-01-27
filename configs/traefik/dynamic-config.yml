@@ -1,0 +1,56 @@
+# Traefik Dynamic Configuration Example
+# Location: /data/coolify/proxy/dynamic/
+
+http:
+  # Middlewares
+  middlewares:
+    redirect-to-https:
+      redirectscheme:
+        scheme: https
+    
+    gzip:
+      compress: true
+    
+    # Security headers (example)
+    security-headers:
+      headers:
+        frameDeny: true
+        sslRedirect: true
+        browserXssFilter: true
+        contentTypeNosniff: true
+        stsIncludeSubdomains: true
+        stsPreload: true
+        stsSeconds: 31536000
+
+  # Routers
+  routers:
+    # Example application router
+    my-app-http:
+      entryPoints:
+        - http
+      rule: "Host(`app.example.com`)"
+      middlewares:
+        - redirect-to-https
+      service: my-app
+    
+    my-app-https:
+      entryPoints:
+        - https
+      rule: "Host(`app.example.com`)"
+      middlewares:
+        - gzip
+        - security-headers
+      tls:
+        certResolver: letsencrypt
+      service: my-app
+
+  # Services
+  services:
+    my-app:
+      loadBalancer:
+        servers:
+          - url: "http://my-app-container:8080"
+        healthCheck:
+          path: /health
+          interval: 10s
+          timeout: 3s

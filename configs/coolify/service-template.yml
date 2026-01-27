@@ -1,0 +1,72 @@
+# Coolify Service Template Example
+# This shows how Coolify generates docker-compose files for services
+
+services:
+  application:
+    image: your/application:latest
+    container_name: app-{unique-id}
+    restart: unless-stopped
+    
+    environment:
+      # Coolify injects these automatically
+      COOLIFY_RESOURCE_UUID: {unique-id}
+      COOLIFY_CONTAINER_NAME: app-{unique-id}
+      COOLIFY_FQDN: app.example.com
+      COOLIFY_URL: https://app.example.com
+      
+      # Service-specific variables
+      SERVICE_NAME: application
+      
+      # User-defined variables (from Coolify UI)
+      DATABASE_URL: postgresql://user:pass@db:5432/dbname
+      API_KEY: ${API_KEY}
+    
+    volumes:
+      - app-data:/data
+    
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:8080/health"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+    
+    networks:
+      - app-network
+    
+    labels:
+      # Coolify management labels
+      - coolify.managed=true
+      - coolify.version=4.0.0-beta.442
+      - coolify.serviceId={service-id}
+      - coolify.type=service
+      - coolify.name=app-{unique-id}
+      - coolify.projectName=my-project
+      - coolify.environmentName=production
+      
+      # Traefik routing labels
+      - traefik.enable=true
+      - traefik.http.middlewares.gzip.compress=true
+      - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
+      
+      # HTTP router
+      - traefik.http.routers.http-app.entryPoints=http
+      - traefik.http.routers.http-app.rule=Host(`app.example.com`)
+      - traefik.http.routers.http-app.middlewares=redirect-to-https
+      
+      # HTTPS router
+      - traefik.http.routers.https-app.entryPoints=https
+      - traefik.http.routers.https-app.rule=Host(`app.example.com`)
+      - traefik.http.routers.https-app.tls.certresolver=letsencrypt
+      - traefik.http.routers.https-app.middlewares=gzip
+      
+      # Service definition
+      - traefik.http.services.https-app.loadbalancer.server.port=8080
+
+volumes:
+  app-data:
+    name: app-data
+
+networks:
+  app-network:
+    name: app-network
+    external: true

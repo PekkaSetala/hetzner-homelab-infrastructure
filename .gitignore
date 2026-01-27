@@ -1,0 +1,27 @@
+# Sensitive files
+*.key
+*.pem
+*.crt
+acme.json
+.env
+*.secret
+
+# Backups
+*.sql
+*.sql.gz
+*.tar.gz
+backups/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Logs
+*.log
