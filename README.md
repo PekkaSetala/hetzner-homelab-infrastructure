@@ -1,4 +1,4 @@
-# Hetzner Infrastructure
+# n8n Automation Infrastructure
 
 Production infrastructure for self-hosted AI services. Runs a multi-service stack on a single Hetzner VPS behind Cloudflare, managed through Coolify with Traefik handling TLS termination and routing.
 
