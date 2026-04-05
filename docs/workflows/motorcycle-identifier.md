@@ -1,80 +1,37 @@
-# AI Motorcycle Visual Identifier
+# AI Motorcycle Identifier
 
-**Platform**: n8n
-**Status**: Production
-**Purpose**: Webhook-triggered image analysis with AI recommendations
+Webhook-triggered image analysis pipeline. Receives a motorcycle photo, identifies it via OpenAI Vision, enriches with market data, and delivers results by email.
 
-## What It Does
-
-Upload a motorcycle image → Get AI identification + recommendations via email.
-
-## Workflow Visualization
+## Flow
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    MOTORCYCLE IDENTIFIER                         │
-└─────────────────────────────────────────────────────────────────┘
-
-[Webhook POST]
-    │ (Image upload)
+Webhook POST (image upload)
     ↓
-[Binary → Base64 Conversion]
+Binary → Base64 conversion
     ↓
-[OpenAI Vision API]
-    │ → Identifies: Make, model, year, features
+OpenAI GPT-4o Vision → make, model, year, features
     ↓
-[OpenRouter LLM + SerpAPI]
-    │ → Generates: Recommendations, similar bikes, pricing
+OpenRouter LLM + SerpAPI → recommendations, similar bikes, pricing
     ↓
-[Markdown → HTML]
-    │ → Formats results
+Markdown → HTML formatting
     ↓
-[Gmail API]
-    │ → Delivers email with analysis
-    ↓
-[Complete]
+Gmail API → delivers analysis email
 ```
 
-## APIs Used
+## APIs
 
-1. **Webhook** - Event trigger
-2. **OpenAI GPT-4o Vision** - Image analysis
-3. **OpenRouter LLM** - Recommendation generation
-4. **SerpAPI** - Web search for market data
-5. **Gmail API** - Email delivery
+1. **Webhook** — event trigger
+2. **OpenAI GPT-4o Vision** — image analysis
+3. **OpenRouter LLM** — recommendation generation
+4. **SerpAPI** — web search for market data
+5. **Gmail API** — email delivery (OAuth2)
 
-## Technical Skills Demonstrated
+## Data Transformation
 
-**Integration Engineering**:
-- Webhook-based event handling
-- Multi-API orchestration (5 APIs chained)
-- Data transformation pipeline (binary → base64 → JSON → markdown → HTML)
-- Error handling and conditional logic
+`binary image → base64 → JSON (Vision API response) → markdown → HTML → email`
 
-**Data Processing**:
-- Binary image processing
-- JSON parsing and manipulation
-- Format conversion (markdown/HTML)
-- Email templating
+Five APIs chained in sequence. Vision API prompts are structured to return consistent fields (make, model, year, condition). The LLM step uses that structured output as context for recommendations.
 
-**Authentication**:
-- API key management
-- OAuth2 (Gmail)
+## Pattern
 
-**Prompt Engineering**:
-- Vision API prompts for structured output
-- Multi-step LLM reasoning
-- Context passing between APIs
-
-## Why This Matters
-
-This pattern (webhook → analysis → enrichment → notification) is common in enterprise integrations:
-- Order processing → validation → fulfillment → confirmation
-- Support tickets → classification → routing → notification
-- Form submissions → processing → CRM update → email
-
-**Transferable to**: Zapier, Make, Frends (Visma), MuleSoft, Power Automate
-
----
-
-*Part of [Hetzner Homelab Infrastructure](../../README.md)*
+Webhook → analysis → enrichment → notification. Same pattern applies to order processing, support ticket routing, or form submission pipelines.

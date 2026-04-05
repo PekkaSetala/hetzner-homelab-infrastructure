@@ -1,257 +1,176 @@
-# Architecture Documentation
+# Architecture
 
-## System Overview
+## Network Topology
 
-This infrastructure implements a microservices architecture using Docker containers, managed through Coolify (a self-hosted PaaS), with Traefik as the edge proxy handling SSL/TLS termination and traffic routing.
-
-## Network Architecture
-
-### External Layer
-
-**Cloudflare (DNS + Proxy)**
-- Handles DNS resolution for all subdomains
-- Provides DDoS protection and CDN capabilities
-- Proxies traffic to Hetzner server (orange cloud enabled)
-- Manages DNS records:
-  - `n8n.example.com` → Hetzner server IP
-  - `app.example.com` → Hetzner server IP (Coolify dashboard)
-
-### Edge Layer
-
-**Traefik v3.6 (Reverse Proxy)**
-- Container: `coolify-proxy`
-- Ports exposed:
-  - `80/tcp` - HTTP (redirects to HTTPS)
-  - `443/tcp` - HTTPS
-  - `443/udp` - HTTP/3 (QUIC)
-  - `8080/tcp` - Traefik dashboard (internal)
-
-**Features:**
-- Automatic service discovery via Docker labels
-- Let's Encrypt ACME HTTP challenge for SSL certificates
-- HTTP/2 and HTTP/3 support
-- Gzip compression middleware
-- Automatic HTTPS redirect
-- Certificate storage in `/data/coolify/proxy/acme.json`
-
-### Application Layer
-
-#### 1. Coolify (Platform Management)
-
-**Container Stack:**
-- `coolify` - Main application (PHP/Laravel)
-- `coolify-db` - PostgreSQL 15
-- `coolify-redis` - Redis 7
-- `coolify-realtime` - Soketi (WebSocket server)
-
-**Network:** `coolify` (internal bridge network)
-
-**Functionality:**
-- Git-based deployments
-- Service templating and management
-- Environment variable encryption
-- Automatic SSL provisioning via Traefik
-- Real-time updates via WebSockets
-
-**Access:** `app.example.com:8000` (mapped to port 8080 internally)
-
-#### 2. n8n (Workflow Automation)
-
-**Container Stack:**
-- `n8n-agsg4okcw8gccsk0sgwcggg4` - n8n application
-- `postgresql-agsg4okcw8gccsk0sgwcggg4` - PostgreSQL 16
-
-**Network:** `agsg4okcw8gccsk0sgwcggg4` (isolated bridge network)
-
-**Configuration:**
-- Internal port: 5678
-- External access: `n8n.example.com` (via Traefik)
-- Database: PostgreSQL with persistent volume
-- Timezone: Europe/Berlin
-- Persistent data: `/home/node/.n8n` (Docker volume)
-
-**Traefik Integration:**
-- Automatic SSL via Let's Encrypt
-- Gzip compression enabled
-- HTTP → HTTPS redirect
-- Health checks on port 5678
-
-**Use Cases:**
-- AI agent workflow orchestration
-- API integration and data transformation
-- Webhook receivers and processors
-- Scheduled automation tasks
-
-## Data Persistence
-
-### Docker Volumes
-
-All persistent data is stored in named Docker volumes:
 ```
-agsg4okcw8gccsk0sgwcggg4_n8n-data              # n8n workflow data
-agsg4okcw8gccsk0sgwcggg4_postgresql-data       # n8n database
-coolify-db                                      # Coolify database
-coolify-redis                                   # Coolify cache
+Internet → Cloudflare (DNS, proxy, DDoS protection)
+               └── Traefik v3.6 (reverse proxy, Let's Encrypt, HTTP/3)
+                       ├── Coolify 4.0    (PaaS — deployment, env management)
+                       └── n8n            (workflow automation, webhook endpoints)
+                               └── PostgreSQL 16 + Redis 7
 ```
 
-**Location:** `/var/lib/docker/volumes/`
+### Layers
 
-**Backup Strategy:**
-- Volumes can be backed up using `docker run --rm` with volume mounts
-- Database dumps recommended for PostgreSQL containers
-- Coolify provides built-in backup functionality
+**Cloudflare** — DNS resolution, DDoS mitigation, origin IP masking. All subdomains proxied (orange cloud).
+- `n8n.example.com` → Hetzner server IP
+- `app.example.com` → Hetzner server IP (Coolify dashboard)
 
-## Service Discovery & Routing
-
-### Traefik Label-Based Routing
-
-Each service uses Docker labels for automatic configuration:
-
-**Example (n8n):**
-```yaml
-labels:
-  - traefik.enable=true
-  - traefik.http.routers.https-0-xxx-n8n.rule=Host(`n8n.example.com`)
-  - traefik.http.routers.https-0-xxx-n8n.entryPoints=https
-  - traefik.http.routers.https-0-xxx-n8n.tls.certresolver=letsencrypt
-  - traefik.http.services.https-0-xxx-n8n.loadbalancer.server.port=5678
-```
+**Traefik v3.6** — Reverse proxy, automatic TLS via Let's Encrypt (ACME HTTP-01), HTTP/2 + HTTP/3. Discovers services via Docker labels — no manual route config needed.
+- Ports: `80` (HTTP → HTTPS redirect), `443` (HTTPS), `443/udp` (QUIC), `8080` (dashboard, internal only)
+- Certificates stored in `/data/coolify/proxy/acme.json`, auto-renewed 30 days before expiry
 
 ### Network Isolation
 
-**External Network:** `coolify`
-- Shared by Coolify core services
-- Traefik proxy connects here
+Each service stack runs on its own Docker bridge network. Only Traefik is exposed to the internet. Databases have no published ports.
 
-**Isolated Networks:**
-- Each application gets its own bridge network
-- Services within the same stack can communicate
-- External access only via Traefik
+```
+coolify network         → Coolify + its PostgreSQL + Redis + Soketi
+n8n network (isolated)  → n8n + its PostgreSQL
+```
 
-## SSL/TLS Management
+## Services
 
-### Let's Encrypt Integration
+### Coolify 4.0
 
-**ACME Challenge:** HTTP-01
-- Certificates requested automatically by Traefik
-- Renewal handled 30 days before expiration
-- Storage: `/data/coolify/proxy/acme.json`
+Container orchestration and deployment platform. Manages Docker Compose configs, environment variables (encrypted), SSL provisioning, and git-based deployments.
 
-**Supported Domains:**
-- `n8n.example.com`
-- `app.example.com`
+**Containers:** `coolify` (PHP/Laravel), `coolify-db` (PostgreSQL 15), `coolify-redis` (Redis 7), `coolify-realtime` (Soketi WebSocket)
 
-**Configuration:**
-```yaml
---certificatesresolvers.letsencrypt.acme.httpchallenge=true
---certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=http
---certificatesresolvers.letsencrypt.acme.storage=/traefik/acme.json
+**Access:** `https://app.example.com:8000`
+
+**Config location:**
+```
+/data/coolify/
+├── source/              # Coolify application + .env
+├── proxy/               # Traefik config + acme.json
+│   └── dynamic/         # Dynamic routing rules
+└── services/{id}/       # Per-service docker-compose + .env
+```
+
+**Commands:**
+```bash
+docker logs coolify -f                          # Logs
+cd /data/coolify/source && docker compose restart  # Restart
+docker compose pull && docker compose up -d     # Update
+docker exec -it coolify-db psql -U postgres -d coolify  # DB access
+```
+
+### n8n
+
+Workflow automation engine. Webhook endpoints, multi-API orchestration, cron scheduling, JavaScript/Python code execution.
+
+**Containers:** `n8n-{id}` (n8n), `postgresql-{id}` (PostgreSQL 16)
+
+**Access:** `https://n8n.example.com` (port 5678 internally)
+
+**Key environment variables:**
+```bash
+N8N_EDITOR_BASE_URL=https://n8n.example.com
+WEBHOOK_URL=https://n8n.example.com
+GENERIC_TIMEZONE=Europe/Helsinki
+DB_TYPE=postgresdb
+```
+
+Full env var reference: [configs/n8n/environment-variables.md](../configs/n8n/environment-variables.md)
+
+**Commands:**
+```bash
+docker logs n8n-{id} -f                        # Logs
+docker restart n8n-{id}                        # Restart
+docker exec n8n-{id} n8n export:workflow --all --output=/tmp/workflows.json  # Export
+docker exec postgresql-{id} pg_dump -U n8n n8n > backup.sql                 # DB backup
+```
+
+### PostgreSQL
+
+Two isolated instances — one for Coolify (v15), one for n8n (v16). Both use Alpine images, persistent volumes, and health checks via `pg_isready`.
+
+```bash
+# Access either database
+docker exec -it postgresql-{id} psql -U {user} -d {db}
+
+# Check size
+docker exec postgresql-{id} psql -U {user} -d {db} \
+  -c "SELECT pg_size_pretty(pg_database_size('{db}'));"
 ```
 
 ## Health Checks
 
-All services implement health checks for reliability:
+All containers have health checks with automatic restart:
 
-**n8n:**
-```yaml
-healthcheck:
-  test: wget -qO- http://127.0.0.1:5678/
-  interval: 5s
-  timeout: 20s
-  retries: 10
+| Service | Check | Interval | Retries |
+|---------|-------|----------|---------|
+| n8n | `wget -qO- http://127.0.0.1:5678/` | 5s | 10 |
+| PostgreSQL | `pg_isready -U $POSTGRES_USER -d $POSTGRES_DB` | 5s | 10 |
+| Traefik | `wget -qO- http://localhost:80/ping` | 4s | 5 |
+
+```bash
+# Quick status check
+docker ps --format "table {{.Names}}\t{{.Status}}"
+
+# Health details for a specific container
+docker inspect {container} | jq '.[0].State.Health'
 ```
 
-**PostgreSQL:**
-```yaml
-healthcheck:
-  test: pg_isready -U $POSTGRES_USER -d $POSTGRES_DB
-  interval: 5s
-  timeout: 20s
-  retries: 10
+## Resource Usage
+
+**Host:** Hetzner CX22 — Ubuntu 24.04 LTS, 4 GB RAM, 2 vCPU, 40 GB disk
+
+| Stack | RAM |
+|-------|-----|
+| Coolify (app + db + redis + ws) | ~600 MB |
+| n8n + PostgreSQL | ~400 MB |
+| Traefik | ~100 MB |
+| **Total** | **~1.1 GB / 4 GB** |
+
+Storage: ~18 GB used of 40 GB. Cost: ~€7/month.
+
+## Data Persistence
+
+All state lives in named Docker volumes under `/var/lib/docker/volumes/`:
+
+```
+{id}_n8n-data           # n8n workflow data (/home/node/.n8n)
+{id}_postgresql-data    # n8n database
+coolify-db              # Coolify database
+coolify-redis           # Coolify cache
 ```
 
-## Resource Allocation
+## Backup & Recovery
 
-**Total System:**
-- RAM: 4GB (1.7GB used)
-- Storage: 40GB (18GB used)
-- CPU: Intel Xeon (shared)
+**Scripts:** [`scripts/backup-procedures.sh`](../scripts/backup-procedures.sh) and [`scripts/restore-procedures.sh`](../scripts/restore-procedures.sh)
 
-**Container Resource Usage:**
-- Coolify stack: ~600MB
-- n8n + PostgreSQL: ~400MB
-- Traefik: ~100MB
+Backup covers: Coolify config (`/data/coolify/`), all PostgreSQL databases, n8n data volume, SSL certificates. 7-day retention with SHA-256 checksums.
 
-## Security Architecture
+**Recovery process:**
+1. Provision new Hetzner server
+2. Install Coolify
+3. Restore `/data/coolify/` and Docker volumes
+4. Restore databases
+5. Update Cloudflare DNS to new IP
+6. Restart services
 
-### Network Security
-- All containers on isolated bridge networks
-- No direct database access from internet
-- Only Traefik exposed to public internet
+**RTO:** ~30 minutes. **RPO:** depends on backup frequency (daily recommended).
 
-### Application Security
-- All traffic encrypted via SSL/TLS
-- Automatic HTTP → HTTPS redirect
-- Cloudflare DDoS protection
+## Security
+
+- TLS everywhere — HTTP → HTTPS enforced at Traefik
+- Let's Encrypt certificates, auto-renewed
+- Cloudflare proxy masks origin IP
+- Per-stack Docker bridge network isolation
+- No database ports exposed
+- UFW firewall (`22`, `80`, `443`)
 - Docker socket mounted read-only where possible
-
-### Access Control
-- Coolify dashboard requires authentication
-- n8n requires authentication
 - Traefik dashboard not publicly exposed
 
 ## Deployment Workflow
 
-1. **Service Definition:** Create docker-compose.yml via Coolify UI
-2. **Network Creation:** Coolify creates isolated network
-3. **Container Launch:** Docker Compose brings up services
-4. **Label Application:** Traefik-compatible labels added
-5. **Service Discovery:** Traefik detects new service
-6. **SSL Provisioning:** Let's Encrypt certificate requested
-7. **Route Activation:** Service becomes accessible via HTTPS
+Adding a new service through Coolify:
 
-## Monitoring & Observability
-
-**Container Status:**
-- Health checks provide automatic restart on failure
-- Docker logs accessible via Coolify UI
-- Traefik access logs available
-
-**System Metrics:**
-- `docker stats` for real-time resource usage
-- `df -h` for disk utilization
-- `free -h` for memory usage
-
-## Scalability Considerations
-
-**Current Setup:**
-- Single-server architecture
-- Suitable for personal/small team use
-- ~1000-5000 requests/day capacity
-
-**Future Scaling Options:**
-- Add dedicated database server
-- Implement load balancing
-- Use Docker Swarm or Kubernetes
-- Add monitoring (Prometheus/Grafana)
-- Implement centralized logging (ELK stack)
-
-## Disaster Recovery
-
-**Backup Targets:**
-- Docker volumes (n8n data, databases)
-- Coolify configuration (`/data/coolify/`)
-- SSL certificates (`/data/coolify/proxy/acme.json`)
-- Docker Compose files
-
-**Recovery Process:**
-1. Provision new Hetzner server
-2. Install Docker and Coolify
-3. Restore `/data/coolify/` directory
-4. Restore Docker volumes
-5. Update Cloudflare DNS to new IP
-6. Restart services
-
-**RTO (Recovery Time Objective):** ~30 minutes
-**RPO (Recovery Point Objective):** Daily backups recommended
-
+1. Define service in Coolify UI (generates docker-compose.yml)
+2. Coolify creates isolated Docker bridge network
+3. Docker Compose brings up containers
+4. Traefik discovers service via Docker labels
+5. Let's Encrypt provisions TLS certificate
+6. Service becomes accessible via HTTPS

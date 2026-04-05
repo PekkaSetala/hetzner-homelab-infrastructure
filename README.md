@@ -55,10 +55,8 @@ Two n8n workflows that ran in production, demonstrating multi-API orchestration,
 
 ## Documentation
 
-- [Getting Started](GETTING-STARTED.md) — Prerequisites and setup
-- [Architecture](docs/architecture.md) — Network topology, service discovery, data persistence
+- [Architecture](docs/architecture.md) — Network topology, service configuration, operations
 - [Deployment Guide](docs/deployment-guide.md) — Step-by-step provisioning
-- [Services](docs/services.md) — Per-service configuration and management
 - [Cloudflare Integration](docs/cloudflare-integration.md) — DNS and proxy setup
 
 ## License

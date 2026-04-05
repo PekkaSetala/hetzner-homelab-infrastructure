@@ -1,92 +1,35 @@
-# Selkokielelle - Plain Language Converter
+# Selkokielelle — Plain Language Converter
 
-**Platform**: n8n
-**Status**: Production
-**Purpose**: Automated Finnish text simplification (accessibility compliance)
+Converts complex Finnish text into selkokieli (plain language) for accessibility compliance. Form submission triggers a GPT-4 pipeline that applies Finnish plain-language guidelines and delivers a side-by-side comparison by email.
 
-## What It Does
-
-Submit complex Finnish text → Get plain-language version via email (side-by-side comparison).
-
-## Workflow Visualization
+## Flow
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                   SELKOKIELELLE CONVERTER                        │
-└─────────────────────────────────────────────────────────────────┘
-
-[Tally Form Webhook]
-    │ (User submits text + email)
+Tally form webhook (text + email)
     ↓
-[Data Extraction]
-    │ → Original text, user email
+Data extraction → original text, sender email
     ↓
-[OpenRouter LLM (GPT-4)]
-    │ → Applies 15+ plain-language guidelines
-    │ → Complex Finnish → Simple Finnish
+OpenRouter LLM (GPT-4) → applies 15+ plain-language rules
     ↓
-[Markdown → HTML]
-    │ → Side-by-side comparison layout
+Markdown → HTML (side-by-side comparison layout)
     ↓
-[Gmail API]
-    │ → Delivers comparison email
-    ↓
-[Complete]
+Gmail API → delivers comparison email
 ```
 
-## APIs Used
+## APIs
 
-1. **Tally Webhook** - Form submission trigger
-2. **OpenRouter LLM** - Text transformation (GPT-4)
-3. **Gmail API** - Email delivery
+1. **Tally webhook** — form submission trigger
+2. **OpenRouter LLM (GPT-4)** — text transformation
+3. **Gmail API** — email delivery
 
-## Technical Skills Demonstrated
+## Prompt Design
 
-**Integration Engineering**:
-- Form webhook integration
-- API orchestration (form → AI → email)
-- Data extraction from webhooks
-- Error handling and validation
-
-**Complex Prompt Engineering**:
-- 15+ Finnish plain-language guidelines encoded in prompt
-- Sentence length limits (8-12 words)
-- Vocabulary simplification rules
+The LLM prompt encodes 15+ guidelines from Finnish accessibility standards:
+- Sentence length limits (8–12 words)
+- Vocabulary simplification
 - Active voice requirements
-- Structured AI output formatting
+- Structured output formatting for side-by-side display
 
-**Data Transformation**:
-- Text processing (complex → plain language)
-- Markdown → HTML conversion
-- Email styling with CSS
-- Side-by-side comparison layout
+## Relevance
 
-**Compliance Automation**:
-- Finnish accessibility standards (Selkokieli)
-- EU Accessibility Directive compliance
-- Government communication requirements
-
-## Why This Matters
-
-**Real Use Cases**:
-- Government: Public sector communications
-- Healthcare: Patient instructions, medical forms
-- Legal: Contract simplification
-- Corporate: HR policies, employee handbooks
-
-**Business Impact**:
-- Time reduction: 30-60 min → 5-10 min per page (80-90% faster)
-- Consistency: Automated compliance vs. manual interpretation
-- Scale: Process volumes impossible manually
-
-**Integration Pattern** (form → transformation → notification) applies to:
-- Translation workflows
-- Content summarization
-- Tone adjustment (formal → casual)
-- Document generation
-
-**Transferable to**: Power Automate, Zapier, Make, Frends (Visma)
-
----
-
-*Part of [Hetzner Homelab Infrastructure](../../README.md)*
+Selkokieli is a recognized standard for accessible Finnish. Relevant to EU Accessibility Directive compliance and public sector communication requirements. The same form → transformation → notification pattern applies to translation, summarization, or tone adjustment workflows.
